@@ -1,0 +1,158 @@
+<?php
+
+
+/**
+* Implementation of hook_menu().
+*/
+function custom_main_menu_menu() {
+  // Admin settings.
+  $items['admin/config/development/custom_main_menu'] = array(
+    'title' => 'Configuración Menú Principal',
+    'description' => 'Opciones de configuración para el menú principal',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('custom_main_menu_admin'),
+    'access arguments' => array('administer site configuration'),
+  );
+  return $items;
+}
+
+/**
+ * Callback function for admin setting.
+ */
+function custom_main_menu_admin() {
+  // This module will not work if used in overlay paths such as 
+  // admin/* , node/add etc if user has overlay access.
+  $form['custom_main_menu_menu'] = array(
+    '#type' => 'select',
+    '#title' => t('Menú'),
+    '#options' => menu_get_menus(),
+    '#default_value' => variable_get('custom_main_menu_menu', 'main-menu'),
+    '#description' => t('Ingrese el menú a mostrar.'),
+  );
+
+  return system_settings_form($form);
+}
+
+/**
+ * Implements hook_block_info().
+ *
+ * This hook declares what blocks are provided by the module.
+ */
+function custom_main_menu_block_info() {
+  $blocks['custom_main_menu_menu'] = array(
+    // info: The name of the block.
+    'info' => t('Bloque del menu principal custom'),
+    // Block caching options (per role, per user, etc.)
+    'cache' => DRUPAL_CACHE_PER_ROLE, // default
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ *
+ * This hook generates the contents of the blocks themselves.
+ */
+function custom_main_menu_block_view($delta = '') {
+  //The $delta parameter tells us which block is being requested.
+  $block = array();  
+  switch ($delta) {
+    case 'custom_main_menu_menu':
+      $block['subject'] = t('Menú principal personalizado');
+      $block['content'] = array('#markup' => custom_main_menu_content());
+      // Add contextual links for this block.
+      if (!empty($block['content'])) {
+        $block['content']['#contextual_links']['menu'] = array('admin/structure/menu/manage', array(variable_get('custom_main_menu_menu', 'main-menu')));
+      }
+    break;
+  }
+  return $block;
+}
+
+// Crea el contenido del menu
+
+function custom_main_menu_content() {
+  $render_html = '<ul id="menu-top" class="nav navbar-nav navbar-left">';
+  $menu = variable_get('custom_main_menu_menu', 'main-menu'); // your menu name
+//  $menu = "book-toc-1";
+  $parameters = array(
+    'min_depth' => 1,
+    'max_depth' => 1,
+  );
+  $menuItems = menu_build_tree($menu, $parameters);
+  $i=0;
+  foreach($menuItems as $m) {
+   if($m['link']['hidden'] == 0) {
+    if(!$m['link']['hidden']) {
+      if($m['link']['has_children']) {
+        $render_html .= theme('custom_main_menu_dropdown', array(
+          'title' => $m['link']['title'], 
+          'link' => $m['link']['href'], 
+          'content' => custom_main_menu_content_submenus($menu, $m['link']['mlid'], $i), 
+          'mlid' => $m['link']['mlid']
+        ));
+        $i++;
+      }
+      else {
+        $render_html .= '<li id="menu-' . $m['link']['mlid'] . '" >' . l($m['link']['title'], $m['link']['href']) . '</li>';
+      }
+    }
+  }
+  }
+  return $render_html . '</ul>';
+}
+
+function custom_main_menu_content_submenus($menu, $plid, $i) {
+  $render_html = "";
+  $parameters = array(
+    'active_trail' => array($plid),
+    'only_active_trail' => FALSE,
+    'min_depth' => 2,
+    'max_depth' => 2,
+    'conditions' => array('plid' => $plid),
+  );
+  $menuItems = menu_build_tree($menu, $parameters);
+  //dpm($menuItems);
+  $j = 0;
+  foreach($menuItems as $m) {
+//    dpm($m);
+  if($m['link']['hidden'] == 0) {
+    if($m['link']['has_children']) {
+      $render_html .= '<div class="mainmenu-links bigger-last"><h3>' . l($m['link']['title'], $m['link']['href'],array('attributes' => array('id'=>array("menu-custom-$i".$j)))) . '</h3>';
+      $parameters = array(
+        'active_trail' => array($m['link']['mlid']),
+        'only_active_trail' => FALSE,
+        'min_depth' => 3,
+        'max_depth' => 3,
+        'conditions' => array('plid' => $m['link']['mlid']),
+      );
+      $menuSubItems = menu_build_tree($menu, $parameters);
+      $menu_item = menu_tree_output($menuSubItems);
+      $render_html .= render($menu_item) . '</div>';
+      $j++;
+    }
+    else {
+      $render_html .= '<span class="mainmenu-nolink bigger-last">' . l($m['link']['title'], $m['link']['href']) . '</span>';
+    }
+  }
+
+}
+  //  $content .= block_get_blocks_by_region('menu_'. $pos);
+  return $render_html;
+}
+/**
+* Implements hook_theme().
+*/
+function custom_main_menu_theme() {
+  return array(
+    'custom_main_menu_dropdown' => array(
+      'template' => 'custom_main_menu_dropdown',
+      'variables' => array(
+        'title' => "",
+        'content' => "",
+        'link' => NULL,
+        'mlid' => NULL,
+      ),
+    ),
+  );
+}

@@ -1,0 +1,7 @@
+name = Custom Main Menu
+description = Menu principal de Personalizado.
+core = 7.x
+dependencies[] = block
+dependencies[] = menu
+
+configure = admin/config/development/custom_main_menu
